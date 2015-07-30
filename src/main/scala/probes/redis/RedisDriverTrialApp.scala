@@ -1,13 +1,17 @@
 package probes.redis
 
+import org.slf4j.{MDC, LoggerFactory}
 import probes.redis.RedisDriverTrial.NodeAddress
 
 object RedisDriverTrialApp extends App {
+
+  val log = LoggerFactory.getLogger(RedisDriverTrialApp.getClass)
+
   case class AppConfig(
     driver: String = "jedis",
     nodes: List[NodeAddress] = List(NodeAddress("localhost", 6379)),
     cluster: Boolean = false,
-    rate: Int = 3000, // flows per second
+    rate: Int = 100, // flows per second
     duration: Int = 60,
     freq: Int = 10
   )
@@ -48,14 +52,14 @@ object RedisDriverTrialApp extends App {
     } text "the flow rate flows/second"
 
     opt[Int]('d', "duration") action { (x, c) =>
-      c.copy(rate = x)
+      c.copy(duration = x)
     } validate { x =>
       if (x > 0) success
       else failure("the duration should be positive")
     } text "the duration of load"
 
     opt[Int]("freq") action { (x, c) =>
-      c.copy(rate = x)
+      c.copy(freq = x)
     } validate { x =>
       if (x > 0) success
       else failure("the freq should be positive")
@@ -64,14 +68,30 @@ object RedisDriverTrialApp extends App {
 
   parser.parse(args, AppConfig()) match {
     case Some(config) =>
-      
+
+      MDC.put("trial", "Init")
+
       val trialSettings = RedisDriverTrial.Settings(config.nodes, config.cluster)
       val trialExecutionSettings = TrialExecutionSettings.FixedRate(
         rate = config.rate,
         duration = config.duration,
         injectionFreq = config.freq
       )
-      
+
+      if (log.isInfoEnabled) {
+        val mode = if (config.cluster) "cluster" else "single master"
+        val nodes = {
+          for { NodeAddress(host, port) <- config.nodes } yield s"$host:$port"
+        }.mkString(" ")
+
+        log.info(s"Redis nodes in $mode mode are: $nodes")
+        log.info(
+          "The trial will run with rate {} flows/s by {} seconds",
+          trialExecutionSettings.rate,
+          trialExecutionSettings.duration
+        )
+      }
+
       val trial = Trials(config.driver)(trialSettings, trialExecutionSettings)
       
       trial.run()

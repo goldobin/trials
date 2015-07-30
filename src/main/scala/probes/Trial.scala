@@ -2,7 +2,7 @@ package probes
 
 import java.util.concurrent.TimeUnit
 
-import com.codahale.metrics.{ConsoleReporter, Slf4jReporter, MetricRegistry}
+import com.codahale.metrics.{ScheduledReporter, ConsoleReporter, Slf4jReporter, MetricRegistry}
 import org.slf4j.{MDC, LoggerFactory}
 
 object Trial {
@@ -15,6 +15,16 @@ trait Trial {
 
   def name: String
 
+  def createConsoleReporter(): ScheduledReporter = ConsoleReporter.forRegistry(metrics)
+    .convertRatesTo(TimeUnit.SECONDS)
+    .convertDurationsTo(TimeUnit.MILLISECONDS)
+    .build()
+
+  def createLogReporter(): ScheduledReporter = Slf4jReporter.forRegistry(metrics)
+    .convertRatesTo(TimeUnit.SECONDS)
+    .convertDurationsTo(TimeUnit.MILLISECONDS)
+    .build()
+
   final def run() = {
 
     MDC.put(Trial.MdcContext, name)
@@ -26,10 +36,7 @@ trait Trial {
 
     log.info("Warm up step finished")
 
-    val reporter = ConsoleReporter.forRegistry(metrics)
-      .convertRatesTo(TimeUnit.SECONDS)
-      .convertDurationsTo(TimeUnit.MILLISECONDS)
-      .build()
+    val reporter = createLogReporter()
 
     reporter.start(5, TimeUnit.SECONDS)
 
