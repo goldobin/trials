@@ -11,9 +11,10 @@ libraryDependencies ++= Seq(
   "redis.clients" % "jedis" % "2.7.3",
   "org.slf4j" % "slf4j-api" % "1.7.12",
   "ch.qos.logback" % "logback-classic" % "1.1.3",
-  "org.redisson" % "redisson" % "1.2.0",
+//  "org.redisson" % "redisson" % "1.2.0",
   "com.etaty.rediscala" %% "rediscala" % "1.4.0",
+  "biz.paluch.redis" % "lettuce" % "4.0.Beta1",
   "com.github.scopt" %% "scopt" % "3.3.0"
 )
 
-    
+addCommandAlias("test-redis-driver", "runMain probes.redis_trials.RedisDriverTrialApp")

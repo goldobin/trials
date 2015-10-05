@@ -1,16 +1,14 @@
-package probes.redis
+package probes.redis_trials
 
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.{ThreadFactory, Executors, TimeUnit, CountDownLatch}
+import java.util.concurrent._
+import java.util.function.{BiConsumer => JBiConsumer, BiFunction => JBiFunction, Function => JFunction, Consumer => JConsumer}
 
 import com.codahale.metrics.{Timer, Meter}
-import org.apache.commons.pool2.impl.GenericObjectPoolConfig
-import org.redisson.{Redisson, Config => RedissonConfig}
-import org.slf4j.LoggerFactory
-import redis.RedisClient
-import redis.clients.jedis._
+import com.lambdaworks.redis.RedisFuture
+
 import probes.Trial
-import probes.redis.RedisDriverTrial.Settings
+import probes.redis_trials.RedisDriverTrial.{NodeAddress, Settings}
 
 import scala.concurrent.{Promise, Future}
 import scala.concurrent.forkjoin.ThreadLocalRandom
@@ -130,10 +128,9 @@ trait RedisDriverTrial extends Trial {
         case Success(_) =>
           successMeter.mark()
 
-        case Failure(NonFatal(e)) => {
+        case Failure(NonFatal(e)) =>
           log.error("Error", e)
           errorMeter.mark()
-        }
       }
       ctx.stop()
       promise.complete(Success(Unit))
@@ -171,7 +168,7 @@ trait RedisDriverTrial extends Trial {
 }
 
 object JedisTrial extends RedisDriverTrialFactory[JedisTrial] {
-  override def apply(redisSettings: Settings, executionSpec: TrialExecutionSettings): JedisTrial =
+  override def apply(redisSettings: Settings, executionSpec: TrialExecutionSettings) =
     new JedisTrial(redisSettings, executionSpec)
 }
 
@@ -179,6 +176,9 @@ class JedisTrial(
   settings: RedisDriverTrial.Settings,
   override val executionSpec: TrialExecutionSettings
 ) extends RedisDriverTrial {
+
+  import redis.clients.jedis._
+  import org.apache.commons.pool2.impl.GenericObjectPoolConfig
 
   val modeName = if (settings.isCluster) "cluster" else "single-master"
 
@@ -252,86 +252,89 @@ class JedisTrial(
   }}
 }
 
-object RedissonTrial extends RedisDriverTrialFactory[RedissonTrial] {
-  override def apply(redisSettings: Settings, executionSpec: TrialExecutionSettings): RedissonTrial =
-    new RedissonTrial(redisSettings, executionSpec)
-}
-
-class RedissonTrial(
-  settings: RedisDriverTrial.Settings,
-  override val executionSpec: TrialExecutionSettings
-) extends RedisDriverTrial {
-
-  val modeName = if (settings.isCluster) "cluster" else "single-master"
-
-  override def name: String = s"Redisson ($modeName)"
-  override def keyPrefix: String = s"redisson: $modeName"
-
-  val config = {
-    val c = new RedissonConfig
-
-    c.setThreads(4)
-
-    if (settings.isCluster) {
-
-      val clusterNodes = settings.nodes map { case RedisDriverTrial.NodeAddress(host, port) => s"$host:$port" }
-
-      c.useClusterServers()
-        .setMasterConnectionPoolSize(100)
-        .addNodeAddress(clusterNodes:_*)
-
-    } else {
-
-      val (RedisDriverTrial.NodeAddress(host, port) :: _) = settings.nodes
-
-      c.useSingleServer()
-        .setConnectionPoolSize(100)
-        .setAddress(s"$host:$port")
-    }
-
-    c
-  }
-
-  val redisson = Redisson.create(config)
-
-  override def performWriteExpireAndPush(
-    key: String,
-    value: String,
-    ttl: Int,
-    queueKey: String) = Future {
-
-    val bucket = redisson.getBucket[String](key)
-
-    bucket.set(value, ttl, TimeUnit.SECONDS)
-
-    val queue = redisson.getQueue[String](queueKey)
-    queue.offer(key)
-  }
-
-  override def performPopReadDelete(queueKey: String) = Future {
-    val queue = redisson.getQueue[String](queueKey)
-    val key = queue.poll()
-
-    val bucket = redisson.getBucket[String](key)
-
-    bucket.delete()
-  }
-}
+//object RedissonTrial extends RedisDriverTrialFactory[RedissonTrial] {
+//  override def apply(redisSettings: Settings, executionSpec: TrialExecutionSettings) =
+//    new RedissonTrial(redisSettings, executionSpec)
+//}
+//
+//class RedissonTrial(
+//  settings: RedisDriverTrial.Settings,
+//  override val executionSpec: TrialExecutionSettings
+//) extends RedisDriverTrial {
+//
+//  import org.redisson.{Redisson, Config => RedissonConfig}
+//
+//  val modeName = if (settings.isCluster) "cluster" else "single-master"
+//
+//  override def name: String = s"Redisson ($modeName)"
+//  override def keyPrefix: String = s"redisson: $modeName"
+//
+//  val config = {
+//    val c = new RedissonConfig
+//
+//    c.setThreads(4)
+//
+//    if (settings.isCluster) {
+//
+//      val clusterNodes = settings.nodes map { case RedisDriverTrial.NodeAddress(host, port) => s"$host:$port" }
+//
+//      c.useClusterServers()
+//        .setMasterConnectionPoolSize(100)
+//        .addNodeAddress(clusterNodes:_*)
+//
+//    } else {
+//
+//      val (RedisDriverTrial.NodeAddress(host, port) :: _) = settings.nodes
+//
+//      c.useSingleServer()
+//        .setConnectionPoolSize(100)
+//        .setAddress(s"$host:$port")
+//    }
+//
+//    c
+//  }
+//
+//  val redisson = Redisson.create(config)
+//
+//  override def performWriteExpireAndPush(
+//    key: String,
+//    value: String,
+//    ttl: Int,
+//    queueKey: String) = Future {
+//
+//    val bucket = redisson.getBucket[String](key)
+//
+//    bucket.set(value, ttl, TimeUnit.SECONDS)
+//
+//    val queue = redisson.getQueue[String](queueKey)
+//    queue.offer(key)
+//  }
+//
+//  override def performPopReadDelete(queueKey: String) = Future {
+//    val queue = redisson.getQueue[String](queueKey)
+//    val key = queue.poll()
+//
+//    val bucket = redisson.getBucket[String](key)
+//
+//    bucket.delete()
+//  }
+//}
 
 object RediscalaTrial extends RedisDriverTrialFactory[RediscalaTrial] {
-  override def apply(redisSettings: Settings, executionSpec: TrialExecutionSettings): RediscalaTrial =
+  override def apply(redisSettings: Settings, executionSpec: TrialExecutionSettings) =
     new RediscalaTrial(redisSettings, executionSpec)
 }
 
 class RediscalaTrial(settings: RedisDriverTrial.Settings, override val executionSpec: TrialExecutionSettings) extends RedisDriverTrial {
-
   assert(!settings.isCluster, "Cluster mode is not supported by this driver")
+
+  import _root_.redis.{RedisClient => RediscalaClient}
 
   val (RedisDriverTrial.NodeAddress(host, port) :: _) = settings.nodes
 
   implicit val akkaSystem = akka.actor.ActorSystem()
 
-  val redis = RedisClient(host, port)
+  val redis = RediscalaClient(host, port)
 
   override def name: String = "Rediscala (single-master)"
   override def keyPrefix: String = "rediscala:single-master"
@@ -356,6 +359,75 @@ class RediscalaTrial(settings: RedisDriverTrial.Settings, override val execution
       Some(key) <- redis.lpop[String](queueKey)
       v <- redis.get[String](key)
       _ <- redis.del(key)
+    } yield Unit
+  }
+}
+
+object LettuceTrial extends RedisDriverTrialFactory[LettuceTrial] {
+  override def apply(redisSettings: Settings, executionSpec: TrialExecutionSettings) =
+    new LettuceTrial(redisSettings, executionSpec)
+}
+
+class LettuceTrial(settings: RedisDriverTrial.Settings, override val executionSpec: TrialExecutionSettings) extends RedisDriverTrial {
+  val modeName = if (settings.isCluster) "cluster" else "single-master"
+
+  override def name: String = s"Lettuce ($modeName)"
+  override def keyPrefix: String = s"lettuce:$modeName"
+
+  import _root_.com.lambdaworks.redis. {RedisClient => LectuceRedisClient, RedisURI => LetuceRedisUri}
+  import _root_.com.lambdaworks.redis.cluster.{RedisClusterClient => LettuceRedisClusterClient}
+
+  val redis = if (settings.isCluster) {
+    val uris = settings.nodes.map {
+      case NodeAddress(host, port) => LetuceRedisUri.create(s"redis://$host:$port/0")
+    }
+
+    val client = new LettuceRedisClusterClient(uris.asJava)
+
+    client.connect().async()
+  } else {
+    val (NodeAddress(host, port) :: _) = settings.nodes
+    val client = new LectuceRedisClient(host, port)
+    client.connect().async()
+  }
+
+  def toFuture[T](rf: RedisFuture[T]): Future[T] = {
+    val p = Promise[T]()
+
+    rf.whenComplete(new JBiConsumer[T, Throwable] {
+      override def accept(v: T, e: Throwable): Unit = {
+        if (e != null) {
+          p.failure(e)
+        } else {
+          p.success(v)
+        }
+      }
+    })
+
+    p.future
+  }
+
+  override def performWriteExpireAndPush(
+      key: String,
+      value: String,
+      ttl: Int,
+      queueKey: String) = {
+
+    val f1 = toFuture(redis.set(key, value))
+    val f2 = toFuture(redis.lpush(queueKey, key))
+
+    for {
+      _ <- f1
+      _ <- f2
+    } yield Unit
+  }
+
+  override def performPopReadDelete(queueKey: String) = {
+
+    for {
+      Some(key) <- toFuture(redis.lpop(queueKey)).map { s => Option(s) }
+      v <- toFuture(redis.get(key))
+      _ <- toFuture(redis.del(key))
     } yield Unit
   }
 }

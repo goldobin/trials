@@ -1,7 +1,7 @@
-package probes.redis
+package probes.redis_trials
 
 import org.slf4j.{MDC, LoggerFactory}
-import probes.redis.RedisDriverTrial.NodeAddress
+import probes.redis_trials.RedisDriverTrial.NodeAddress
 
 object RedisDriverTrialApp extends App {
 
@@ -18,8 +18,9 @@ object RedisDriverTrialApp extends App {
 
   val Trials = Map(
     "jedis" -> JedisTrial,
-    "redisson" -> RedissonTrial,
-    "rediscala" -> RediscalaTrial
+//    "redisson" -> RedissonTrial,
+    "rediscala" -> RediscalaTrial,
+    "lettuce" -> LettuceTrial
   )
 
   val parser = new scopt.OptionParser[AppConfig]("scopt") {
@@ -56,14 +57,14 @@ object RedisDriverTrialApp extends App {
     } validate { x =>
       if (x > 0) success
       else failure("the duration should be positive")
-    } text "the duration of load"
+    } text "the duration of load seconds"
 
     opt[Int]("freq") action { (x, c) =>
       c.copy(freq = x)
     } validate { x =>
       if (x > 0) success
       else failure("the freq should be positive")
-    } text "the frequency of injections per second"
+    } text "the frequency of injections/second"
   }
 
   parser.parse(args, AppConfig()) match {

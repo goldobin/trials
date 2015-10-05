@@ -1,4 +1,4 @@
-package probes.threadpools
+package probes.thread_pools
 
 import probes.AbstractTrialApp
 
