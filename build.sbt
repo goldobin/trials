@@ -1,3 +1,6 @@
+import com.typesafe.sbt.packager.archetypes.JavaAppPackaging
+import com.typesafe.sbt.packager.docker.DockerPlugin
+
 name := "trials"
 
 version := "1.0"
@@ -17,4 +20,11 @@ libraryDependencies ++= Seq(
   "com.github.scopt" %% "scopt" % "3.3.0"
 )
 
+mainClass in Compile := Some("probes.redis_trials.RedisDriverTrialApp")
+
+packageName in Docker := "components/redis-trials"
+
 addCommandAlias("test-redis-driver", "runMain probes.redis_trials.RedisDriverTrialApp")
+
+enablePlugins(JavaAppPackaging)
+enablePlugins(DockerPlugin)
