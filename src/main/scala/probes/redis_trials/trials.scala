@@ -61,10 +61,12 @@ trait RedisDriverTrial extends Trial {
   protected def nextQueueKey = s"$keyPrefix:queue-$randQueueSuffix"
 
   private val wepTimer = metrics.timer("write-expire-push:time")
+  private val wepTry = metrics.meter("write-expire-push")
   private val wepSuccess = metrics.meter("write-expire-push:success")
   private val wepError = metrics.meter("write-expire-push:error")
 
   private val prdTimer = metrics.timer("pop-read-delete:time")
+  private val prdTry = metrics.meter("pop-read-delete")
   private val prdSuccess = metrics.meter("pop-read-delete:success")
   private val prdError = metrics.meter("pop-read-delete:error")
 
@@ -145,6 +147,7 @@ trait RedisDriverTrial extends Trial {
     val ttl = nextTtl
 
     instrumentOperation (wepSuccess, wepError, wepTimer) {
+      wepTry.mark()
       performWriteExpireAndPush(key, value, ttl, nextQueueKey)
     }
   }
@@ -155,6 +158,7 @@ trait RedisDriverTrial extends Trial {
     val ttl = nextTtl
 
     instrumentOperation (prdSuccess, prdError, prdTimer) {
+      prdTry.mark()
       performWriteExpireAndPush(key, value, ttl, nextQueueKey)
     }
   }
