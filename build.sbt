@@ -22,7 +22,7 @@ libraryDependencies ++= Seq(
 
 mainClass in Compile := Some("probes.redis_trials.RedisDriverTrialApp")
 
-packageName in Docker := "components/redis-trials"
+packageName in Docker := "redis-trials"
 
 addCommandAlias("test-redis-driver", "runMain probes.redis_trials.RedisDriverTrialApp")
 
