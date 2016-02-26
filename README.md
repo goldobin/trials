@@ -1,17 +1,10 @@
+# Redis Driver Trials
+
 # Build
 
     sbt clean compile
 
-# Trials
-
-A set of trials of various things realted to Java/Scala/JDK/JVM:
-
-1. Different ThreadPool submission timings
-
-2. Redis driver comparison
-
-
-# Redis Driver Trials
+# Run
 
 Run `sbt`
 
@@ -39,7 +32,7 @@ test-redis-driver --driver lettuce -d 180 -r 500 --cluster true -h 127.0.0.1:750
 test-redis-driver --driver rediscala -d 180 -r 500 --cluster true -h 127.0.0.1:7501,127.0.0.1:7502,127.0.0.1:7503,127.0.0.1:7504,127.0.0.1:7505,127.0.0.1:7506
 ```
 
-# Docker
+# Run in Docker
 
 To package to the docker image the 
 [sbt-native-packager](http://www.scala-sbt.org/sbt-native-packager/formats/docker.html) is used. To package locally run:
